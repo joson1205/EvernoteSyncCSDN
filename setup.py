@@ -16,12 +16,13 @@ class GetNotes(object):
         self.currentUserId = None
         self.listNotebooks = {}
         self.listNotestore = {}
+        self.notetags = {}
         self.result = {}
         self.session = self.login()
         self.notebooks()
         while True:
             self.num_1 = input("请输入笔记本名称序号:")
-            # self.num_1 = "2"
+            # self.num_1 = "12"
             if self.num_1 in self.listNotebooks.keys():
                 self.notestore(self.listNotebooks[self.num_1]["name"])
                 break
@@ -29,6 +30,7 @@ class GetNotes(object):
                 print("输入有误，请重新输入！")
         while True:
             self.num_2 = input("请输入笔记标题序号:")
+            # self.num_2 = "1"
             if self.num_2 in self.listNotestore.keys():
                 self.notecontent(self.listNotestore[self.num_2]["token"])
                 break
@@ -76,7 +78,12 @@ class GetNotes(object):
         response = self.session.get(home_url, headers=headers, params=payload).text
         self.userShardId = re.findall('(?<=userShardId":").+?(?=")', response)[0]
         self.currentUserId = re.findall('(?<=currentUserId":)\d+', response)[0]
-        notebooks_str = re.findall("(?<=listNotebooks:).+(?=,)", response)[0]
+        tags_str = re.findall("(?<=listTags:).+]", response)[0]  # 标签
+        notebooks_str = re.findall("(?<=listNotebooks:).+(?=,)", response)[0]  # 笔记本
+        tags = eval(tags_str.replace('\\', '').replace('"{', '{').replace('}"', '}'))
+        # 标签{token:name,...}
+        for tag in tags:
+            self.notetags[tag["1"]["str"]] = tag["2"]["str"]
         # 笔记本列表(转嵌套列表)
         Notebooks = {}
         listNotebooks = eval(notebooks_str.replace('\\', '').replace('"{', '{').replace('}"', '}'))
@@ -158,18 +165,38 @@ class GetNotes(object):
         print(tb, "\n")
 
     def notecontent(self, token):
+        url = "https://app.yinxiang.com/shard/{}/enweb/notestore".format(self.userShardId)
+        headers = {
+            "Host": "app.yinxiang.com",
+            "Origin": "https://app.yinxiang.com",
+            "Pragma": "no-cache",
+            "Referer": "https://app.yinxiang.com/Home.action",
+            "User-Agent": "Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.131 Safari/537.36",
+            "X-EN-Webclient-CSRF": self.req_sec,
+            "X-GWT-Permutation": self.JSESSIONID,
+            "X-EN-Webclient-Version": "WEB2.0",
+            "X-GWT-Module-Base": "https://app.yinxiang.com/focusclient/"
+        }
+        payload = "7|0|8|https://app.yinxiang.com/focusclient/|CA89028168A1400F0E5BA1CB2B1B829D|com.evernote.web.shared.GWTNoteStoreInterface|getNoteWithResultSpec|java.lang.String/2004016611|com.evernote.edam.notestore.NoteResultSpec/3324952227|{}|[Z/1413617015|1|2|3|4|2|5|6|7|6|8|8|1|1|1|1|1|0|0|0|0|0|0|0|0|0|0|1|".format(
+            token)
+        res = self.session.post(url, headers=headers, data=payload)
+        # 提取标签
+        tags = []
+        for key in self.notetags.keys():
+            if key in res.text:
+                tags.append(self.notetags[key])
+        self.result["tags"] = ",".join(tags)
+
         url = "https://app.yinxiang.com/shard/{}/nl/{}/{}?content=".format(self.userShardId, self.currentUserId, token)
         headers = {
             "Referer": "https://app.yinxiang.com/shard/{}/nl/{}/{}".format(self.userShardId, self.currentUserId, token),
             "User-Agent": "Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.131 Safari/537.36"}
         res = self.session.post(url, headers=headers)
-        # print(res.text)
         html = etree.HTML(res.text)
         contentHTML = html.xpath('//div[@class="note-content"]')
         contentStr = etree.tostring(contentHTML[0])
         self.result["title"] = self.listNotestore[self.num_2]["name"]
         self.result["content"] = contentStr
-        self.result["tags"] = ''
 
 
 class SyncCSDN(object):
