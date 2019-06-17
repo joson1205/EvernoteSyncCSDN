@@ -1,4 +1,7 @@
 # EvernoteSyncCSDN
+![image](https://github.com/joson1205/EvernoteSyncCSDN/blob/master/sample.gif)
+
+## 实现原理
 通过抓包分析,然后模拟请求的方式获取数据,同步到CSDN博客上,并非API.
 不采用API的原因主要是因为两个方面:
 1.印象笔记官方的API申请后只能通过沙盒环境测试用,没办法直接获取到实际数据;可以申请临时API,不过有效期只有7天.API的接口只支持Python2,很遗憾,本人已经放弃使用.
