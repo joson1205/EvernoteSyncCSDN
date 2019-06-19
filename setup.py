@@ -22,16 +22,14 @@ class GetNotes(object):
         self.session = self.login()
         self.notebooks()
         while True:
-            # self.num_1 = input("请输入笔记本名称序号:")
-            self.num_1 = "12"
+            self.num_1 = input("请输入笔记本名称序号:")
             if self.num_1 in self.listNotebooks.keys():
                 self.notestore(self.listNotebooks[self.num_1]["name"])
                 break
             else:
                 print("输入有误，请重新输入！")
         while True:
-            # self.num_2 = input("请输入笔记标题序号:")
-            self.num_2 = "1"
+            self.num_2 = input("请输入笔记标题序号:")
             if self.num_2 in self.listNotestore.keys():
                 self.notecontent(self.listNotestore[self.num_2]["token"])
                 break
