@@ -6,6 +6,7 @@ import requests
 import re
 from lxml import etree
 import prettytable as pt
+from io import BytesIO
 
 
 class GetNotes(object):
@@ -21,16 +22,16 @@ class GetNotes(object):
         self.session = self.login()
         self.notebooks()
         while True:
-            self.num_1 = input("请输入笔记本名称序号:")
-            # self.num_1 = "12"
+            # self.num_1 = input("请输入笔记本名称序号:")
+            self.num_1 = "12"
             if self.num_1 in self.listNotebooks.keys():
                 self.notestore(self.listNotebooks[self.num_1]["name"])
                 break
             else:
                 print("输入有误，请重新输入！")
         while True:
-            self.num_2 = input("请输入笔记标题序号:")
-            # self.num_2 = "1"
+            # self.num_2 = input("请输入笔记标题序号:")
+            self.num_2 = "1"
             if self.num_2 in self.listNotestore.keys():
                 self.notecontent(self.listNotestore[self.num_2]["token"])
                 break
@@ -195,8 +196,24 @@ class GetNotes(object):
         html = etree.HTML(res.text)
         contentHTML = html.xpath('//div[@class="note-content"]')
         contentStr = etree.tostring(contentHTML[0])
+        contentStr = re.sub('\?resizeSmall.+?(?=")', "", str(contentStr)[2:-3])
         self.result["title"] = self.listNotestore[self.num_2]["name"]
         self.result["content"] = contentStr
+        self.noteimage()
+
+    def noteimage(self):
+        image = re.findall("https://app\.yinxiang\.com/shard/.+?.(?:jpg|png|gif|jpeg)", str(self.result["content"]))
+        img_list = []
+        for img in image:
+            img_list.append({
+                "name": img.split("/")[-1],
+                "type": "image/" + img.split(".")[-1],
+                "url": img
+            })
+        for img in img_list:
+            res = self.session.get(img["url"])
+            img["bytes_content"] = res.content
+        self.result["image"] = img_list
 
 
 class SyncCSDN(object):
@@ -245,6 +262,25 @@ class SyncCSDN(object):
         res = self.session.post(url, headers=headers, data=str(data)).json()
         print("CSDN博客登陆状态:{}".format(res["message"]))
 
+    def uploadImage(self, notes, headers):
+        if notes["image"]:
+            url = "https://mp.csdn.net/UploadImage?shuiyin=2"
+            for img in notes["image"]:
+                img_file = BytesIO(img["bytes_content"])
+                files = {
+                    "file": (img["name"], img_file.getvalue(), img["type"])
+                }
+                res = self.session.post(url, headers=headers, files=files).json()
+                if res["result"] == 1:
+                    # 替换图片url
+                    notes["content"] = notes["content"].replace(img["url"], res["url"])
+                    # notes["content"] = str(notes["content"]).replace(img["url"], res["url"])
+                    img["bytes_content"] = None
+
+        else:
+            pass
+        return notes
+
     # 发布
     def draft(self, notes):
         url = "https://mp.csdn.net/mdeditor/saveArticle"
@@ -254,6 +290,7 @@ class SyncCSDN(object):
             "User-Agent": "Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.131 Safari/537.36",
             "Referer": "https://mp.csdn.net/mdeditor?not_checkout=1"
         }
+        notes = self.uploadImage(notes, headers)
         payload = {
             'title': notes['title'],
             'markdowncontent': notes['content'],
